@@ -44,7 +44,7 @@ _simulation_seed(θ::NamedTuple) = hash(Tuple(Float64.(values(θ))), 0x434149_4e
 
 """
     abc_smc(simulate, priors, distance, observed; tolerance, nparticles=500, rng,
-            parallel=false, verbose=false, kwargs...) -> ABCPosterior
+            parallel=false, strict=true, verbose=false, kwargs...) -> ABCPosterior
     abc_smc(prob::CAProblem, priors, distance, observed; parameters=identity,
             alg=Synchronous(), solve_kwargs=(;), kwargs...) -> ABCPosterior
 
@@ -63,13 +63,18 @@ distance compares that solution with `observed`.
 
 Each simulation's seed is a hash of its parameter values, so a particle's
 distance does not depend on the order or thread in which it was computed.
+A particle is kept while its distance is below the tolerance (`strict`, ABCdeZ's
+default) or at most the tolerance (`strict=false`). With discrete summaries,
+such as counts, many particles share a distance, and under the strict kernel a
+tolerance equal to that shared value removes them all: use `strict=false`
+there. If no particle survives, `abc_smc` raises [`ABCFailureError`](@ref).
 `rng` drives the sampler itself: a run is reproducible with `parallel=false`
 and a seeded `rng`; with `parallel=true` the threads share `rng`, which must be
 thread-safe, and runs are not reproducible.
 """
 function abc_smc(simulate, priors::NamedTuple, distance, observed; tolerance::Real,
                  nparticles::Integer=500, rng::AbstractRNG, parallel::Bool=false,
-                 verbose::Bool=false, kwargs...)
+                 strict::Bool=true, verbose::Bool=false, kwargs...)
     _check_priors(priors)
     tolerance >= 0 || throw(ArgumentError("tolerance must be nonnegative, got $tolerance"))
     names = keys(priors)
@@ -80,9 +85,11 @@ function abc_smc(simulate, priors::NamedTuple, distance, observed; tolerance::Re
         d >= 0 || throw(ArgumentError("distances must be nonnegative, got $d at $nt"))
         return d, nothing
     end
+    kernel = strict ? ABCdeZ.IndicatorStrict0toϵ : ABCdeZ.Indicator0toϵ
     r = ABCdeZ.abcdesmc!(prior, dist!, Float64(tolerance), nothing;
-                         nparticles=Int(nparticles),
-                         rng, parallel, verbose, verboseout=true, kwargs...)
+                         nparticles=Int(nparticles), rng, parallel, verbose,
+                         verboseout=true, ABCk=kernel, kwargs...)
+    any(>(0), r.Wns) || throw(ABCFailureError(Float64(r.ϵ), Float64(tolerance)))
     vals = reduce(vcat, (collect(Float64, Tuple(p))' for p in r.P))
     return ABCPosterior(collect(names), vals, collect(Float64, r.Wns),
                         collect(Float64, r.C), Float64(r.ϵ), Float64(r.logZ),

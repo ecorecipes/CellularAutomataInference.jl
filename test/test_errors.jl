@@ -19,4 +19,6 @@ end
     end
     e = SupportError("β", -1.0, "outside the prior")
     @test sprint(showerror, e) == "SupportError: β = -1.0: outside the prior"
+    @test occursin("at tolerance 0.2 (target 0.1)",
+                   sprint(showerror, ABCFailureError(0.2, 0.1)))
 end

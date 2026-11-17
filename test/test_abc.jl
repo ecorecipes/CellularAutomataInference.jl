@@ -30,6 +30,14 @@
         @test_throws ArgumentError abc_smc(simulate, (μ=Normal(0, 5),),
                                            (s, o) -> -1.0, ybar; tolerance=0.1,
                                            nparticles=50, rng=Xoshiro(1))
+        # distances tied at the tolerance all fail ABCdeZ's strict kernel: no particle lives
+        @test_throws ABCFailureError abc_smc(simulate, (μ=Normal(0, 5),), (s, o) -> 1.0,
+                                             0.0;
+                                             tolerance=0.5, nparticles=50, rng=Xoshiro(2))
+        # the inclusive kernel keeps them
+        tied = abc_smc(simulate, (μ=Normal(0, 5),), (s, o) -> 1.0, 0.0; tolerance=0.5,
+                       nparticles=50, rng=Xoshiro(2), strict=false, nsims_max=500)
+        @test count(>(0), tied.weights) == 50 && tied.tolerance == 1.0
     end
 
     @testset "a cellular automaton problem" begin

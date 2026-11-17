@@ -47,7 +47,7 @@ export abc_smc, ABCPosterior
 # Diagnostics
 export effective_sample_size, rhat, posterior_summary
 # Exceptions
-export CellularAutomataInferenceError, SupportError
+export CellularAutomataInferenceError, SupportError, ABCFailureError
 
 include("errors.jl")
 include("priors.jl")

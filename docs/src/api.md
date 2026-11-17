@@ -46,6 +46,7 @@ posterior_summary
 ```@docs
 CellularAutomataInferenceError
 SupportError
+ABCFailureError
 ```
 
 ## Module
